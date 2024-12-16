@@ -162,7 +162,8 @@ local function run_args(_, name, args)
     false))
 end
 
-M.run = function(file, runner)
+M.run = function(info, runner)
+  local file = file_path:new(info.file)
   local args = {}
   local f = run_args
   local val_type
@@ -181,11 +182,13 @@ M.run = function(file, runner)
           vim.log.levels.ERROR)
         break
       end
+    elseif val_type == 'function' then
+      table.insert(args, v(info))
     else
       ok = false
       vim.notify_once(
-        string.format('WgcRun: Unknown entry type in run_command. Expected "%s" or "%s", found "%s"', 'string',
-          'table', val_type), vim.log.levels.ERROR)
+        string.format('WgcRun: Unknown entry type in run_command. Expected "%s","%s" or "%s", found "%s"', 'string',
+          'table', 'function', val_type), vim.log.levels.ERROR)
       break
     end
   end

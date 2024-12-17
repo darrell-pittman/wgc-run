@@ -31,14 +31,24 @@ local function tbl_pad(t)
   return vim.tbl_map(pad, t)
 end
 
+
 local disp = nil
 
-local function kill_job()
+local function kill_job(f)
   if current_job_id and disp then
     vim.fn.jobstop(current_job_id)
     api.nvim_buf_set_lines(disp.buf, -1, -1, false, { pad(string.format("Killed Job [ id = %d ]", current_job_id)) })
     current_job_id = nil
   end
+  if f then f() end
+end
+
+local function close_window()
+  kill_job(function()
+    disp = nil
+    current_job_id = nil
+    vim.cmd [[bwipeout]]
+  end)
 end
 
 local function open_window(callback)
@@ -62,8 +72,9 @@ local function open_window(callback)
     silent = true,
     nowait = true,
   })
-  map('n', 'q', ':bwipeout<cr>')
-  map('n', '<esc>', ':bwipeout<cr>')
+
+  map('n', 'q', close_window)
+  map('n', '<esc>', close_window)
   map('n', '<C-c>', kill_job)
 
   local noops = { 'a', 'c', 'd', 'i', 'x', 'r', 'o', 'p', }
@@ -84,7 +95,17 @@ local function open_window(callback)
   callback()
 end
 
-local function default_runner(header, footer, cmd, buffered)
+local function default_runner(name, cmd, opts)
+  local header = tbl_pad({
+    name .. ' output ...', ''
+  })
+
+  local footer = tbl_pad({
+    '',
+    '--' .. name .. ' Finished!--',
+  })
+
+
   local default_handler = function(_, data)
     if data then
       data = vim.tbl_filter(utils.string.is_not_empty, data)
@@ -97,29 +118,29 @@ local function default_runner(header, footer, cmd, buffered)
     end
   end
 
+  opts.on_stdout = default_handler
+  opts.on_stderr = default_handler
+
+  opts.on_exit = function()
+    if disp then
+      api.nvim_buf_set_lines(disp.buf, -1, -1, false, footer)
+    end
+    current_job_id = nil
+  end
+
   return function()
     kill_job()
     if disp then
       api.nvim_buf_set_lines(disp.buf, -1, -1, false, header)
     end
-    current_job_id = vim.fn.jobstart(cmd, {
-      on_stdout = default_handler,
-      on_stderr = default_handler,
-      on_exit = function()
-        if disp then
-          api.nvim_buf_set_lines(disp.buf, -1, -1, false, footer)
-        end
-        current_job_id = nil
-      end,
-      stdout_buffered = buffered,
-    })
+    current_job_id = vim.fn.jobstart(cmd, opts)
     if disp then
       api.nvim_buf_set_lines(disp.buf, -1, -1, false, { pad(string.format("Started Job [ id = %d ]", current_job_id)) })
     end
   end
 end
 
-local function run_search_up(file, name, args)
+local function run_search_up(file, name, args, opts)
   local search_index, search_up
   local file_action = function(f) return tostring(f) end
   for i, v in ipairs(args) do
@@ -136,14 +157,7 @@ local function run_search_up(file, name, args)
     if found_file then
       found_file = file_action(found_file)
       args[search_index] = found_file
-      open_window(default_runner(tbl_pad({
-          name .. ' output ...', ''
-        }), tbl_pad({
-          '',
-          '--' .. name .. ' Finished!--',
-        }),
-        args,
-        false))
+      open_window(default_runner(name, args, opts))
     else
       vim.notify_once(string.format('WgcRun: Failed to find file "%s" when running "search_up" run_command.', search_up),
         vim.log.levels.ERROR)
@@ -151,15 +165,8 @@ local function run_search_up(file, name, args)
   end))
 end
 
-local function run_args(_, name, args)
-  open_window(default_runner(tbl_pad({
-      name .. ' output ...', ''
-    }), tbl_pad({
-      '',
-      '--' .. name .. ' Finished!--',
-    }),
-    args,
-    false))
+local function run_args(_, name, args, opts)
+  open_window(default_runner(name, args, opts))
 end
 
 M.run = function(info, runner)
@@ -168,6 +175,18 @@ M.run = function(info, runner)
   local f = run_args
   local val_type
   local ok = true
+
+  local opts = {
+    stdout_bufferd = false,
+    cwd = nil,
+  }
+
+  if runner.wgc_run then
+    opts.cwd = runner.wgc_run.cwd
+    f(file, runner.name, runner.wgc_run.args, opts)
+    return
+  end
+
   for _, v in ipairs(runner.run_command) do
     val_type = type(v)
     if val_type == 'string' then
@@ -192,6 +211,7 @@ M.run = function(info, runner)
       break
     end
   end
+
   if ok then
     f(file, runner.name, args)
   end

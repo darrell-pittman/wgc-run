@@ -79,17 +79,24 @@ end
 
 local function create_run_command(info, runner, buffer_keymaps)
   local file = file_path:new(info.file)
-  run_tests_ok(info, runner.run_tests, function(ok)
-    if ok then
-      if buffer_keymaps and type(buffer_keymaps) == 'function' then
-        buffer_keymaps(info)
-      end
-
-      vim.api.nvim_buf_create_user_command(info.buf, 'WgcRun', function()
-          run.run(info, runner)
-        end,
-        {})
+  file:search_up(file_path:new('.wgc_run'), function(wgc_run)
+    if wgc_run then
+      runner.wgc_run = loadfile(tostring(wgc_run))()
+      runner.run_command = nil
     end
+
+    run_tests_ok(info, runner.run_tests, function(ok)
+      if ok then
+        if buffer_keymaps and type(buffer_keymaps) == 'function' then
+          buffer_keymaps(info)
+        end
+
+        vim.api.nvim_buf_create_user_command(info.buf, 'WgcRun', function()
+            run.run(info, runner)
+          end,
+          {})
+      end
+    end)
   end)
 end
 

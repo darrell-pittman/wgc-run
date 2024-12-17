@@ -140,10 +140,10 @@ local function default_runner(name, cmd, opts)
   end
 end
 
-local function run_search_up(file, name, args, opts)
+local function run_search_up(file, name, cmd, opts)
   local search_index, search_up
   local file_action = function(f) return tostring(f) end
-  for i, v in ipairs(args) do
+  for i, v in ipairs(cmd) do
     if type(v) == 'table' then
       search_up = v.search_up
       search_index = i
@@ -156,8 +156,8 @@ local function run_search_up(file, name, args, opts)
   file:search_up(file_path:new(search_up), vim.schedule_wrap(function(found_file)
     if found_file then
       found_file = file_action(found_file)
-      args[search_index] = found_file
-      open_window(default_runner(name, args, opts))
+      cmd[search_index] = found_file
+      open_window(default_runner(name, cmd, opts))
     else
       vim.notify_once(string.format('WgcRun: Failed to find file "%s" when running "search_up" run_command.', search_up),
         vim.log.levels.ERROR)
@@ -165,14 +165,14 @@ local function run_search_up(file, name, args, opts)
   end))
 end
 
-local function run_args(_, name, args, opts)
-  open_window(default_runner(name, args, opts))
+local function run_cmd(_, name, cmd, opts)
+  open_window(default_runner(name, cmd, opts))
 end
 
 M.run = function(info, runner)
   local file = file_path:new(info.file)
-  local args = {}
-  local f = run_args
+  local cmd = {}
+  local f = run_cmd
   local val_type
   local ok = true
 
@@ -182,18 +182,21 @@ M.run = function(info, runner)
   }
 
   if runner.wgc_run then
-    opts.cwd = runner.wgc_run.cwd
-    f(file, runner.name, runner.wgc_run.args, opts)
+    if runner.wgc_run.cwd then
+      opts.cwd = vim.fn.expand(runner.wgc_run.cwd)
+    end
+
+    run_cmd(file, runner.name, runner.wgc_run.cmd, opts)
     return
   end
 
   for _, v in ipairs(runner.run_command) do
     val_type = type(v)
     if val_type == 'string' then
-      table.insert(args, v)
+      table.insert(cmd, v)
     elseif val_type == 'table' then
       if v.search_up then
-        table.insert(args, v)
+        table.insert(cmd, v)
         f = run_search_up
       else
         ok = false
@@ -202,7 +205,7 @@ M.run = function(info, runner)
         break
       end
     elseif val_type == 'function' then
-      table.insert(args, v(info))
+      table.insert(cmd, v(info))
     else
       ok = false
       vim.notify_once(
@@ -212,8 +215,8 @@ M.run = function(info, runner)
     end
   end
 
-  if ok then
-    f(file, runner.name, args, opts)
+  if ok and #cmd > 0 then
+    f(file, runner.name, cmd, opts)
   end
 end
 

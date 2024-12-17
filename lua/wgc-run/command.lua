@@ -81,12 +81,12 @@ local function create_run_command(info, runner, buffer_keymaps)
   local file = file_path:new(info.file)
   file:search_up(file_path:new('.wgc_run'), vim.schedule_wrap(function(wgc_run)
     if wgc_run then
-      local m = loadfile(tostring(wgc_run))
+      local m, err = loadfile(tostring(wgc_run))
       if m then
         runner.wgc_run = m()
         runner.run_command = nil
       else
-        vim.notify_once(string.format('WgcRun: Failed to load "%s" config file.', wgc_run:name()),
+        vim.notify_once(string.format('WgcRun: Failed to load "%s" config file. Error: %s', wgc_run:name(), err),
           vim.log.levels.ERROR)
       end
     end

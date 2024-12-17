@@ -10,7 +10,7 @@ following keys:
 * runners (required)
 
 ### buffer_keymaps
-This entry id a function that takes in the info object and creates 
+This entry is a function that takes in the autocmd info object and creates 
 any keymaps desired for the current buffer. Here where can map keystrokes
 to the WgcRun command for the current buffer.
 
@@ -24,7 +24,7 @@ output of the program.
 
 A runner definition is a table the following keys:
 * name (required) - The name of the runner
-* autopat (required) - A string that specifies that file pattern to match
+* autopat (required) - A string that specifies the file pattern to match
 for this runner. This is the same as the autopat used for autocmds in neovim.
 If the file you open matches this autopat the :WgcRun command will be created
 for your buffer.
@@ -63,7 +63,7 @@ The runner configs for the wgc-run plugin do not require a run_command definitio
 You can put a file called .wgn_run in the root of your project. This will be a lua
 file that defines the command to be run when :WgcRun command is called. The .wgc_run
 file is a lua module that must return a lua table with the following keys:
-* cmd (required) - A list of strings that will be passed as the the cmd arg to vim.fn.jobstart 
+* cmd (required) - A list of strings that will be passed as the cmd arg to vim.fn.jobstart 
 function.
 * cwd (optional) - A string with the working directory to be used in the call to 
 vim.fn.jobstart function.

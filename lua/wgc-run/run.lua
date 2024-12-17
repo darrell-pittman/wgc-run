@@ -213,7 +213,7 @@ M.run = function(info, runner)
   end
 
   if ok then
-    f(file, runner.name, args)
+    f(file, runner.name, args, opts)
   end
 end
 
